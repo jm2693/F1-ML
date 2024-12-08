@@ -62,3 +62,14 @@ class Weather(Base):
     weather_dry = Column(Boolean)
     weather_wet = Column(Boolean)
     weather_cloudy = Column(Boolean)
+    
+class Qualifying(Base):
+    __tablename__ = 'qualifying'
+    
+    id = Column(Integer, primary_key=True)
+    season = Column(Integer)
+    round = Column(Integer)
+    grid_position = Column(Integer)
+    driver_name = Column(String)
+    car = Column(String)
+    qualifying_time = Column(String)  

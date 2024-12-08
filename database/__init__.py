@@ -1,5 +1,5 @@
 from .database import Database
-from .models import Race, Result, DriverStanding, ConstructorStanding, Weather
+from .models import Race, Result, DriverStanding, ConstructorStanding, Weather, Qualifying
 
 # This makes these classes available when importing from the database package
 __all__ = [
@@ -8,5 +8,6 @@ __all__ = [
     'Result', 
     'DriverStanding',
     'ConstructorStanding',
-    'Weather'
+    'Weather',
+    'Qualifying'
 ]

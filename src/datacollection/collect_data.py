@@ -264,6 +264,78 @@ def scrape_weather_from_wiki(url):
             return clima
     except:
         return 'not found'
+    
+    
+    
+def collect_qualifying_data(start_year: int = 1983, end_year: int = 2020):
+    """
+    Collects qualifying data from Formula 1 races. We start from 1983 because
+    that's when consistent qualifying data becomes available in the format we need.
+    
+    This function follows the example's approach of gathering qualifying times
+    and positions, but stores them in our SQLite database instead of CSV files.
+    """
+    db = Database()
+    session = db.get_session()
+
+    try:
+        qualifying_results = []
+        for year in range(start_year, end_year + 1):
+            print(f"Collecting qualifying data for {year}...")
+            
+            # Get the races for this year
+            url = f'https://www.formula1.com/en/results.html/{year}/races.html'
+            r = requests.get(url)
+            soup = BeautifulSoup(r.text, 'html.parser')
+            
+            # Find all race links for this year
+            year_links = []
+            for page in soup.find_all('a', attrs={'class': "resultsarchive-filter-item-link FilterTrigger"}):
+                link = page.get('href')
+                if f'/en/results.html/{year}/races/' in link:
+                    year_links.append(link)
+
+            # Process each race's qualifying results
+            for n, link in enumerate(year_links, 1):
+                try:
+                    # Modify link to point to qualifying results instead of race results
+                    quali_link = link.replace('race-result.html', 'starting-grid.html')
+                    quali_url = f'https://www.formula1.com{quali_link}'
+                    
+                    # Read qualifying data table
+                    df = pd.read_html(quali_url)[0]
+                    df['season'] = year
+                    df['round'] = n
+                    
+                    # Clean up the qualifying times and positions
+                    df = df.rename(columns={'Pos': 'grid_position', 'Driver': 'driver_name', 'Car': 'car',
+                                          'Time': 'qualifying_time'})
+                    
+                    # Store in database
+                    for _, row in df.iterrows():
+                        qualifying_entry = Qualifying(
+                            season=year,
+                            round=n,
+                            grid_position=row['grid_position'],
+                            driver_name=row['driver_name'],
+                            car=row['car'],
+                            qualifying_time=row['qualifying_time'] if pd.notna(row['qualifying_time']) else None
+                        )
+                        session.add(qualifying_entry)
+                    
+                    session.commit()
+                    print(f"Stored qualifying data for {year} Round {n}")
+                    
+                except Exception as e:
+                    print(f"Error collecting qualifying data for {year} Round {n}: {str(e)}")
+                    continue
+
+    except Exception as e:
+        print(f"Error in qualifying data collection: {str(e)}")
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 if __name__ == "__main__":
     # This allows us to run the data collection directly
