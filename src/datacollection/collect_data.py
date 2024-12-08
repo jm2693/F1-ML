@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy as np
 import requests
+from datetime import datetime
 from bs4 import BeautifulSoup
 from database.database import Database
 from database.models import Race, Result, DriverStanding, ConstructorStanding, Weather
@@ -31,7 +32,7 @@ def collect_race_data(start_year: int = 1950, end_year: int = 2020):
                     round=int(item['round']),
                     circuit_id=item['Circuit']['circuitId'],
                     country=item['Circuit']['Location']['country'],
-                    date=item['date']
+                    date=datetime.strptime(item['date'], '%Y-%m-%d').date()
                 )
                 session.add(race)
                 session.flush()
@@ -45,7 +46,7 @@ def collect_race_data(start_year: int = 1950, end_year: int = 2020):
                     result_entry = Result(
                         race_id=race.id,
                         driver=result['Driver']['driverId'],
-                        date_of_birth=result['Driver']['dateOfBirth'],
+                        date_of_birth=datetime.strptime(result['Driver']['dateOfBirth'], '%Y-%m-%d').date(),
                         nationality=result['Driver']['nationality'],
                         constructor=result['Constructor']['constructorId'],
                         grid=int(result['grid']),
