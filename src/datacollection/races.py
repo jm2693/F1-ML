@@ -182,3 +182,99 @@ def get_rounds(races_data):
         rounds.append([year, list(races_data[races_data.season == year]['round'])])
     return rounds
 
+
+
+def collect_weather_data(races_data):
+    """
+    Collects weather data from Wikipedia pages, following the example's approach
+    of scraping and categorizing weather conditions.
+    """
+    db = Database()
+    session = db.get_session()
+
+    # Define weather categories just like in the example
+    weather_dict = {
+        'weather_warm': ['soleggiato', 'clear', 'warm', 'hot', 'sunny', 'fine', 'mild', 'sereno'],
+        'weather_cold': ['cold', 'fresh', 'chilly', 'cool'],
+        'weather_dry': ['dry', 'asciutto'],
+        'weather_wet': ['showers', 'wet', 'rain', 'pioggia', 'damp', 'thunderstorms', 'rainy'],
+        'weather_cloudy': ['overcast', 'nuvoloso', 'clouds', 'cloudy', 'grey', 'coperto']
+    }
+
+    try:
+        for _, race in races_data.iterrows():
+            print(f"Collecting weather data for {race['season']} Round {race['round']}...")
+            
+            # Get weather information from Wikipedia
+            try:
+                weather_text = scrape_weather_from_wiki(race['url'])
+            except:
+                weather_text = 'not found'
+
+            # Create weather condition booleans
+            weather_conditions = {
+                category: 1 if any(word in weather_text.lower() for word in terms) else 0
+                for category, terms in weather_dict.items()
+            }
+
+            # Store in database
+            weather_entry = Weather(
+                season=race['season'],
+                round=race['round'],
+                circuit_id=race['circuit_id'],
+                weather_description=weather_text,
+                **weather_conditions
+            )
+            session.add(weather_entry)
+            
+            # Commit periodically
+            if _ % 50 == 0:  # Commit every 50 races
+                session.commit()
+
+        # Final commit
+        session.commit()
+
+    except Exception as e:
+        print(f"Error collecting weather data: {str(e)}")
+        session.rollback()
+        raise
+    finally:
+        session.close()
+        
+        
+        
+        
+
+def scrape_weather_from_wiki(url):
+    """
+    Scrapes weather information from Wikipedia, handling both English and Italian pages
+    just like in the example.
+    """
+    try:
+        df = pd.read_html(url)[0]
+        if 'Weather' in list(df.iloc[:,0]):
+            n = list(df.iloc[:,0]).index('Weather')
+            return df.iloc[n,1]
+        else:
+            # Try subsequent tables
+            for i in range(1, 4):
+                try:
+                    df = pd.read_html(url)[i]
+                    if 'Weather' in list(df.iloc[:,0]):
+                        n = list(df.iloc[:,0]).index('Weather')
+                        return df.iloc[n,1]
+                except:
+                    continue
+                    
+            # If not found, try Italian page
+            driver = webdriver.Chrome()
+            driver.get(url)
+            
+            # Click language button
+            button = driver.find_element_by_link_text('Italiano')
+            button.click()
+            
+            clima = driver.find_element_by_xpath('//*[@id="mw-content-text"]/div/table[1]/tbody/tr[9]/td').text
+            return clima
+    except:
+        return 'not found'
