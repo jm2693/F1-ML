@@ -101,5 +101,5 @@ def clean_and_aggregate_data(database_path):
         session.close()
 
 if __name__ == "__main__":
-    database_path = "path_to_your_database.db"
+    database_path = "f1_prediction.db"
     clean_and_aggregate_data(database_path)
