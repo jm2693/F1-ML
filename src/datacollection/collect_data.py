@@ -1,19 +1,15 @@
 import pandas as pd
-import numpy as np
+# import numpy as np
 import requests
 from datetime import datetime
-from bs4 import BeautifulSoup
+# from bs4 import BeautifulSoup
 from database.database import Database
 from database.models import Race, Result, DriverStanding, ConstructorStanding, Weather
-from sqlalchemy.orm import Session
+# from sqlalchemy.orm import Session
 from typing import List
 
 def collect_race_data(start_year: int = 1950, end_year: int = 2020):
-    """
-    Collects race data and results from the Ergast API.
-    Just like in the example, we gather basic race information and results,
-    but store them in our SQLite database instead of CSV files.
-    """
+
     db = Database()
     session = db.get_session()
 
@@ -66,10 +62,7 @@ def collect_race_data(start_year: int = 1950, end_year: int = 2020):
         session.close()
 
 def collect_driver_standings(rounds: List[List]):
-    """
-    Collects driver standings data. Takes a list of year/round pairs
-    to know which races to collect data for.
-    """
+
     db = Database()
     session = db.get_session()
 
@@ -108,15 +101,11 @@ def collect_driver_standings(rounds: List[List]):
         session.close()
 
 def collect_constructor_standings(rounds: List[List]):
-    """
-    Collects constructor standings data. The constructor championship started in 1958,
-    so we'll need to handle this special case just like the example did.
-    """
+
     db = Database()
     session = db.get_session()
 
     try:
-        # Constructor championship started in 1958
         constructor_rounds = rounds[8:]  # Skip first 8 years
         
         for year_rounds in constructor_rounds:
@@ -154,9 +143,6 @@ def collect_constructor_standings(rounds: List[List]):
 
 def get_rounds(races_data):
     """
-    Helper function to create the rounds list structure used in the example.
-    This helps us maintain the same data organization pattern.
-    
     Args:
         races_data: The races table from our database
         
@@ -171,14 +157,10 @@ def get_rounds(races_data):
 
 
 def collect_weather_data(races_data):
-    """
-    Collects weather data from Wikipedia pages, following the example's approach
-    of scraping and categorizing weather conditions.
-    """
+
     db = Database()
     session = db.get_session()
 
-    # Define weather categories just like in the example
     weather_dict = {
         'weather_warm': ['soleggiato', 'clear', 'warm', 'hot', 'sunny', 'fine', 'mild', 'sereno'],
         'weather_cold': ['cold', 'fresh', 'chilly', 'cool'],
@@ -191,19 +173,16 @@ def collect_weather_data(races_data):
         for _, race in races_data.iterrows():
             print(f"Collecting weather data for {race['season']} Round {race['round']}...")
             
-            # Get weather information from Wikipedia
             try:
                 weather_text = scrape_weather_from_wiki(race['url'])
             except:
                 weather_text = 'not found'
 
-            # Create weather condition booleans
             weather_conditions = {
                 category: 1 if any(word in weather_text.lower() for word in terms) else 0
                 for category, terms in weather_dict.items()
             }
 
-            # Store in database
             weather_entry = Weather(
                 season=race['season'],
                 round=race['round'],
@@ -213,11 +192,9 @@ def collect_weather_data(races_data):
             )
             session.add(weather_entry)
             
-            # Commit periodically
-            if _ % 50 == 0:  # Commit every 50 races
+            if _ % 50 == 0: 
                 session.commit()
 
-        # Final commit
         session.commit()
 
     except Exception as e:
@@ -232,17 +209,13 @@ def collect_weather_data(races_data):
         
 
 def scrape_weather_from_wiki(url):
-    """
-    Scrapes weather information from Wikipedia, handling both English and Italian pages
-    just like in the example.
-    """
+
     try:
         df = pd.read_html(url)[0]
         if 'Weather' in list(df.iloc[:,0]):
             n = list(df.iloc[:,0]).index('Weather')
             return df.iloc[n,1]
         else:
-            # Try subsequent tables
             for i in range(1, 4):
                 try:
                     df = pd.read_html(url)[i]
@@ -252,11 +225,9 @@ def scrape_weather_from_wiki(url):
                 except:
                     continue
                     
-            # If not found, try Italian page
             driver = webdriver.Chrome()
             driver.get(url)
             
-            # Click language button
             button = driver.find_element_by_link_text('Italiano')
             button.click()
             
@@ -266,14 +237,12 @@ def scrape_weather_from_wiki(url):
         return 'not found'
 
 if __name__ == "__main__":
-    # This allows us to run the data collection directly
+    
     db = Database()
     db.create_tables()
     
-    # Collect all data
-    collect_race_data(start_year=2015, end_year=2020)  # Using smaller range for testing
+    collect_race_data(start_year=2015, end_year=2020)  
     
-    # Get race data for rounds
     session = db.get_session()
     races_df = pd.read_sql("SELECT * FROM races", session.bind)
     rounds = get_rounds(races_df)
