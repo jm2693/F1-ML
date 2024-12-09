@@ -1,5 +1,6 @@
 from database.database import Database
 from src.datacollection.collect_data import (
+    collect_qualifying_data,
     collect_race_data, 
     collect_driver_standings,
     collect_constructor_standings, 
@@ -12,38 +13,31 @@ from src.model.predict import F1Predictor
 
 import pandas as pd
 import os
-import sys
 
 def test_data_collection(start_year=2015, end_year=2020):
-    """
-    Tests the data collection process.
-    Uses a smaller date range for faster testing.
-    """
+
     print("\n1. Testing Data Collection...")
     try:
-        # Setup database
         db = Database()
         db.create_tables()
         
-        # Collect race data
         print("  Collecting race data...")
         collect_race_data(start_year=start_year, end_year=end_year)
         
-        # Get rounds information
         session = db.get_session()
         races_df = pd.read_sql("SELECT * FROM races", session.bind)
         rounds = get_rounds(races_df)
         
-        # Collect standings
         print("  Collecting standings data...")
         collect_driver_standings(rounds)
         collect_constructor_standings(rounds)
         
-        # Collect weather data
+        print("  Collecting qualifying data...")
+        collect_qualifying_data(start_year=start_year, end_year=end_year)
+        
         print("  Collecting weather data...")
         collect_weather_data(races_df)
         
-        # Verify data collection
         results = pd.read_sql("SELECT COUNT(*) as count FROM races", session.bind).iloc[0]['count']
         print(f"  ✓ Collected {results} races")
         
@@ -59,21 +53,26 @@ def test_data_cleaning():
     """
     print("\n2. Testing Data Cleaning...")
     try:
-        clean_and_aggregate_data("f1_prediction.db")
+        # Run cleaning process
+        cleaning_success = clean_and_aggregate_data("f1_prediction.db")
         
-        # Verify cleaned data exists
-        db = Database()
-        session = db.get_session()
-        
-        # Check if aggregated tables exist
-        driver_agg = pd.read_sql("SELECT COUNT(*) as count FROM driver_aggregates", session.bind).iloc[0]['count']
-        constructor_agg = pd.read_sql("SELECT COUNT(*) as count FROM constructor_aggregates", session.bind).iloc[0]['count']
-        
-        print(f"  ✓ Created {driver_agg} driver aggregates")
-        print(f"  ✓ Created {constructor_agg} constructor aggregates")
-        
-        return True
-        
+        if cleaning_success:
+            # Verify the results only if cleaning succeeded
+            db = Database()
+            session = db.get_session()
+            
+            driver_agg = pd.read_sql("SELECT COUNT(*) as count FROM driver_aggregates", 
+                                   session.bind).iloc[0]['count']
+            constructor_agg = pd.read_sql("SELECT COUNT(*) as count FROM constructor_aggregates", 
+                                        session.bind).iloc[0]['count']
+            
+            print(f"  ✓ Created {driver_agg} driver aggregates")
+            print(f"  ✓ Created {constructor_agg} constructor aggregates")
+            return True
+        else:
+            print("  ✗ Data cleaning process failed")
+            return False
+            
     except Exception as e:
         print(f"  ✗ Data cleaning failed: {str(e)}")
         return False

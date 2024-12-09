@@ -4,15 +4,26 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 
 def load_data(engine):
-
-    races = pd.read_sql("SELECT * FROM races", engine)
-    results = pd.read_sql("SELECT * FROM results", engine)
-    driver_standings = pd.read_sql("SELECT * FROM driver_standings", engine)
-    constructor_standings = pd.read_sql("SELECT * FROM constructor_standings", engine)
-    weather = pd.read_sql("SELECT * FROM weather", engine)
-    qualifying = pd.read_sql("SELECT * FROM qualifying", engine) # no table exists
-    
-    return races, results, driver_standings, constructor_standings, weather, qualifying
+    try:
+        races = pd.read_sql("SELECT * FROM races", engine)
+        results = pd.read_sql("SELECT * FROM results", engine)
+        driver_standings = pd.read_sql("SELECT * FROM driver_standings", engine)
+        constructor_standings = pd.read_sql("SELECT * FROM constructor_standings", engine)
+        weather = pd.read_sql("SELECT * FROM weather", engine)
+        
+        try:
+            qualifying = pd.read_sql("SELECT * FROM qualifying", engine)
+        except:
+            print("Note: Qualifying table not found, will proceed without qualifying data")
+            qualifying = None
+            
+        if races.empty or results.empty:
+            raise ValueError("Required race or results data is missing")
+        
+        return races, results, driver_standings, constructor_standings, weather, qualifying
+    except Exception as e:
+        print(f"Error loading data: {str(e)}")
+        raise
 
 
 def clean_races(races_df):
@@ -75,10 +86,14 @@ def clean_weather(weather_df):
     return weather_df
 
 def aggregate_driver_data(results_df, races_df):
+    
 
-    merged_df = results_df.merge(races_df[['id', 'date']], 
+    print(races_df.head())
+    print(results_df.head())
+    merged_df = results_df.merge(races_df[['id', 'date', 'season']], 
                                left_on='race_id', 
                                right_on='id')
+    print(merged_df.head())
     
     driver_aggregates = merged_df.groupby(['driver', 'season']).agg(
         total_points=('points', 'sum'),
@@ -101,9 +116,13 @@ def aggregate_driver_data(results_df, races_df):
     
     return driver_aggregates
 
-def aggregate_constructor_data(results_df):
+def aggregate_constructor_data(results_df, races_df):
+    
+    merged_df = results_df.merge(races_df[['id', 'date', 'season']], 
+                               left_on='race_id', 
+                               right_on='id')
 
-    constructor_aggregates = results_df.groupby(['constructor', 'season']).agg(
+    constructor_aggregates = merged_df.groupby(['constructor', 'season']).agg(
         constructor_points=('points', 'sum'),
         avg_constructor_grid=('grid', 'mean'),
         avg_constructor_position=('position', 'mean'),
@@ -112,17 +131,38 @@ def aggregate_constructor_data(results_df):
     return constructor_aggregates
 
 def add_target_variable(driver_aggregates, driver_standings_df):
+    
+    try:
+        # For driver_standings_df, we need to handle potential binary data
+        if driver_standings_df['season'].dtype == 'object':
+            # Try to decode if it's binary
+            driver_standings_df['season'] = driver_standings_df['season'].apply(
+                lambda x: int(x) if isinstance(x, (int, str)) else int.from_bytes(x, byteorder='little')
+            )
+    except Exception as e:
+        print(f"Error converting driver_standings seasons: {str(e)}")
+        # Let's print some sample values to understand what we're dealing with
+        print("Sample season values from driver_standings:")
+        print(driver_standings_df['season'].head())
+        raise
 
     champions = driver_standings_df[driver_standings_df['position'] == 1][['season', 'driver']]
     champions['is_champion'] = 1
 
+    print("\nAfter conversion:")
+    print("Champions seasons:", champions['season'].head())
+    print("Driver aggregates seasons:", driver_aggregates['season'].head())
+
+    # Perform the merge with our cleaned data
     driver_aggregates = pd.merge(
         driver_aggregates,
         champions,
         how='left',
         on=['season', 'driver']
     )
+    
     driver_aggregates['is_champion'] = driver_aggregates['is_champion'].fillna(0)
+    
     return driver_aggregates
 
 def save_cleaned_data(driver_data, constructor_data, weather_data, qualifying_data, engine):
@@ -138,25 +178,64 @@ def clean_and_aggregate_data(database_path):
     session = sessionmaker(bind=engine)()
 
     try:
+        print("Loading raw data...")
         races, results, driver_standings, constructor_standings, weather, qualifying = load_data(engine)
         
-        races = clean_races(races)
-        results = clean_results(results)
-        weather = clean_weather(weather)
-        qualifying = clean_qualifying(qualifying)
+        print("Cleaning individual datasets...")
+        try:
+            races = clean_races(races)
+            print("  ✓ Races cleaned")
+            
+            results = clean_results(results)
+            print("  ✓ Results cleaned")
+            
+            weather = clean_weather(weather)
+            print("  ✓ Weather cleaned")
+            
+            # Only clean qualifying if it exists and has data
+            if qualifying is not None and not qualifying.empty:
+                qualifying = clean_qualifying(qualifying)
+                print("  ✓ Qualifying cleaned")
+            else:
+                print("  - No qualifying data to clean")
+                qualifying = pd.DataFrame()  # Create empty DataFrame
         
-        driver_aggregates = aggregate_driver_data(results, races)
-        constructor_aggregates = aggregate_constructor_data(results)
+        except Exception as e:
+            print(f"Error during data cleaning: {str(e)}")
+            raise
+            
+        print("Creating aggregations...")
+        try:
+            driver_aggregates = aggregate_driver_data(results, races)
+            print("  ✓ Driver aggregates created")
+            
+            constructor_aggregates = aggregate_constructor_data(results, races)
+            print("  ✓ Constructor aggregates created")
+            
+            driver_aggregates = add_target_variable(driver_aggregates, driver_standings)
+            print("  ✓ Target variable added")
+            
+        except Exception as e:
+            print(f"Error during aggregation: {str(e)}")
+            raise
         
-        driver_aggregates = add_target_variable(driver_aggregates, driver_standings)
+        print("Saving cleaned data...")
+        try:
+            save_cleaned_data(driver_aggregates, constructor_aggregates, 
+                            weather, qualifying, engine)
+            print("  ✓ All cleaned data saved")
+            
+        except Exception as e:
+            print(f"Error saving cleaned data: {str(e)}")
+            raise
         
-        save_cleaned_data(driver_aggregates, constructor_aggregates, 
-                         weather, qualifying, engine)
-        
-        print("Enhanced data cleaning and aggregation complete!")
+        print("Data cleaning and aggregation completed successfully!")
+        return True
         
     except Exception as e:
-        print(f"Error during cleaning process: {e}")
+        print(f"Error during cleaning process: {str(e)}")
+        session.rollback()
+        return False
     finally:
         session.close()
 

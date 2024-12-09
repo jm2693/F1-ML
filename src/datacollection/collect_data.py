@@ -4,7 +4,7 @@ import requests
 from datetime import datetime
 # from bs4 import BeautifulSoup
 from database.database import Database
-from database.models import Race, Result, DriverStanding, ConstructorStanding, Weather
+from database.models import Qualifying, Race, Result, DriverStanding, ConstructorStanding, Weather
 # from sqlalchemy.orm import Session
 from typing import List
 
@@ -154,7 +154,40 @@ def get_rounds(races_data):
         rounds.append([year, list(races_data[races_data.season == year]['round'])])
     return rounds
 
+def collect_qualifying_data(start_year: int = 1983, end_year: int = 2020):
 
+    db = Database()
+    session = db.get_session()
+
+    try:
+        for year in range(start_year, end_year + 1):
+            print(f"Collecting qualifying data for {year}...")
+            
+            url = f'https://ergast.com/api/f1/{year}/qualifying.json'
+            r = requests.get(url)
+            json = r.json()
+
+            for item in json['MRData']['RaceTable']['Races']:
+                for quali in item['QualifyingResults']:
+                    quali_entry = Qualifying(
+                        season=int(item['season']),
+                        round=int(item['round']),
+                        driver=quali['Driver']['driverId'],
+                        grid_position=int(quali['position']),
+                        qualifying_time=quali['Q3'] if 'Q3' in quali else (
+                            quali['Q2'] if 'Q2' in quali else quali['Q1']),
+                        car=quali['Constructor']['constructorId']
+                    )
+                    session.add(quali_entry)
+                
+            session.commit()
+
+    except Exception as e:
+        print(f"Error collecting qualifying data: {str(e)}")
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 def collect_weather_data(races_data):
 
