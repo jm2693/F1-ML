@@ -3,7 +3,7 @@ from sqlalchemy import create_engine
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
-import joblib  # To save the trained model
+import joblib  
 
 def load_cleaned_data(database_path):
     """

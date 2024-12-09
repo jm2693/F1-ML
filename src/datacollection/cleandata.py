@@ -3,28 +3,41 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy import create_engine
 
 def load_data(engine):
-    """
-    Load raw data from SQLite database into pandas DataFrames.
-    """
+
     races = pd.read_sql("SELECT * FROM races", engine)
     results = pd.read_sql("SELECT * FROM results", engine)
     driver_standings = pd.read_sql("SELECT * FROM driver_standings", engine)
     constructor_standings = pd.read_sql("SELECT * FROM constructor_standings", engine)
-    return races, results, driver_standings, constructor_standings
+    qualifying = pd.read_sql("SELECT * FROM qualifying", engine)
+    
+    return races, results, driver_standings, constructor_standings, qualifying
 
 def clean_results(results_df):
-    """
-    Clean the results DataFrame.
-    """
-    results_df['position'] = pd.to_numeric(results_df['position'], errors='coerce')  # Handle non-numeric positions
-    results_df['points'] = results_df['points'].fillna(0)  # Fill missing points with 0
-    results_df['grid'] = results_df['grid'].fillna(results_df['grid'].mean())  # Fill missing grid positions with mean
+    
+    results_df['position'] = pd.to_numeric(results_df['position'], errors='coerce')  
+    
+    results_df['points'] = results_df['points'].fillna(0)  
+    
+    results_df['grid'] = pd.to_numeric(results_df['grid'], errors='coerce')
+    results_df['grid'] = results_df['grid'].fillna(results_df['grid'].mean())  
+    
+    status_mapping = {
+        'Finished': 'Finished',
+        'Did not finish': 'DNF',
+        'Disqualified': 'DSQ',
+        'Did not qualify': 'DNQ',
+        'Accident': 'DNF',
+        'Collision': 'DNF',
+        'Engine': 'DNF-Mechanical'
+    }
+    results_df['status'] = results_df['status'].replace(status_mapping)
+    
+    results_df['date_of_birth'] = pd.to_datetime(results_df['date_of_birth'])
+    
     return results_df
 
 def aggregate_driver_data(results_df):
-    """
-    Aggregate driver-level data for each season.
-    """
+
     driver_aggregates = results_df.groupby(['driver', 'season']).agg(
         total_points=('points', 'sum'),
         total_wins=('position', lambda x: (x == 1).sum()),
@@ -32,6 +45,7 @@ def aggregate_driver_data(results_df):
         avg_final_position=('position', 'mean'),
         total_races=('race_id', 'count')
     ).reset_index()
+    
     return driver_aggregates
 
 def aggregate_constructor_data(results_df):

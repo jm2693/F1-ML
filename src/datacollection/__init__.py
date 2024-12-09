@@ -6,7 +6,6 @@ from .collect_data import (
     get_rounds
 )
 
-# Make these functions available at the package level
 __all__ = [
     'collect_race_data',
     'collect_driver_standings',
