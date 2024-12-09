@@ -10,7 +10,7 @@ def load_data(engine):
     driver_standings = pd.read_sql("SELECT * FROM driver_standings", engine)
     constructor_standings = pd.read_sql("SELECT * FROM constructor_standings", engine)
     weather = pd.read_sql("SELECT * FROM weather", engine)
-    qualifying = pd.read_sql("SELECT * FROM qualifying", engine)
+    qualifying = pd.read_sql("SELECT * FROM qualifying", engine) # no table exists
     
     return races, results, driver_standings, constructor_standings, weather, qualifying
 

@@ -74,23 +74,24 @@ def evaluate_model(model, X_test, y_test):
     
     return accuracy
 
-def save_model(model, output_path):
-
+def save_model(model, scaler, output_path):
     joblib.dump(model, output_path)
-    print(f"Model saved to {output_path}")
+    joblib.dump(scaler, output_path.replace('.pkl', '_scaler.pkl'))
+    print(f"Model and scaler saved to {output_path}")
 
 if __name__ == "__main__":
-    database_path = "f1_prediction.db" 
-    model_output_path = "models/f1_winner_predictor.pkl"  
-
+    database_path = "f1_prediction.db"
+    model_output_path = "models/f1_winner_predictor.pkl"
+    
     print("Loading cleaned data...")
     driver_aggregates = load_cleaned_data(database_path)
-    X_train, X_test, y_train, y_test = prepare_data(driver_aggregates)
-
+    X_train, X_test, y_train, y_test, scaler = prepare_data(driver_aggregates)
+    
     print("Training model...")
     model = train_model(X_train, y_train)
-
+    
     print("Evaluating model...")
     evaluate_model(model, X_test, y_test)
-
-    save_model(model, model_output_path)
+    
+    save_model(model, scaler, model_output_path)
+    

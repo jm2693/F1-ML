@@ -6,7 +6,6 @@ from datetime import datetime
 class F1Predictor:
 
     def __init__(self, model_path, database_path):
-        # Load the trained model and scaler
         self.model = joblib.load(model_path)
         self.scaler = joblib.load(model_path.replace('.pkl', '_scaler.pkl'))
         self.database_path = database_path

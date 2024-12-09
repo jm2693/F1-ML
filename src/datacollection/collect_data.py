@@ -204,10 +204,6 @@ def collect_weather_data(races_data):
     finally:
         session.close()
         
-        
-        
-        
-
 def scrape_weather_from_wiki(url):
 
     try:
