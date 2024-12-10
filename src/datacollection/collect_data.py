@@ -1,12 +1,10 @@
-import pandas as pd
-# import numpy as np
 import requests
+import pandas as pd
+from typing import List
 from datetime import datetime
-# from bs4 import BeautifulSoup
+# from selenium import webdriver
 from database.database import Database
 from database.models import Qualifying, Race, Result, DriverStanding, ConstructorStanding, Weather
-# from sqlalchemy.orm import Session
-from typing import List
 
 def collect_race_data(start_year: int = 1950, end_year: int = 2020):
 

@@ -88,12 +88,21 @@ def clean_weather(weather_df):
 def aggregate_driver_data(results_df, races_df):
     
 
-    print(races_df.head())
-    print(results_df.head())
+    print(f"Number of results before merge: {len(results_df)}")
+    print(f"Number of races before merge: {len(races_df)}")
+    
     merged_df = results_df.merge(races_df[['id', 'date', 'season']], 
                                left_on='race_id', 
                                right_on='id')
-    print(merged_df.head())
+    
+    # Print counts after merge
+    print(f"Number of rows after merge: {len(merged_df)}")
+    
+    # Check for duplicates
+    duplicates = merged_df.groupby(['driver', 'season']).size().reset_index(name='count')
+    duplicates = duplicates[duplicates['count'] > 1]
+    print("\nDrivers with multiple entries in same season:")
+    print(duplicates)
     
     driver_aggregates = merged_df.groupby(['driver', 'season']).agg(
         total_points=('points', 'sum'),

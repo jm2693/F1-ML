@@ -8,7 +8,7 @@ from src.datacollection.collect_data import (
     get_rounds
 )
 from src.datacollection.cleandata import clean_and_aggregate_data
-from src.model.train_model import train_model, load_cleaned_data, prepare_data, evaluate_model
+from src.model.train_model import save_model, train_model, load_cleaned_data, prepare_data, evaluate_model
 from src.model.predict import F1Predictor
 
 import pandas as pd
@@ -83,23 +83,29 @@ def test_model_training():
     """
     print("\n3. Testing Model Training...")
     try:
+        
+        database_path = "f1_prediction.db"
+        model_output_path = "models/f1_winner_predictor.pkl"
+    
         # Make sure models directory exists
         os.makedirs('models', exist_ok=True)
         
-        # Load data and train model
-        driver_aggregates = load_cleaned_data("f1_prediction.db")
-        X_train, X_test, y_train, y_test = prepare_data(driver_aggregates)
+        print("Loading cleaned data...")
+        driver_aggregates = load_cleaned_data(database_path)
         
-        print("  Training model...")
+        print("Preparing data for training...")
+        X_train, X_test, y_train, y_test, scaler = prepare_data(driver_aggregates)
+        
+        print("Training model...")
         model = train_model(X_train, y_train)
         
-        print("  Evaluating model...")
-        accuracy = evaluate_model(model, X_test, y_test)
+        print("Evaluating model...")
+        evaluate_model(model, X_test, y_test)
         
-        # Save model
-        model_path = "models/f1_winner_predictor.pkl"
-        model.save(model_path)
-        print(f"  ✓ Model saved to {model_path}")
+        print("Saving model and scaler...")
+        save_model(model, scaler, model_output_path)
+        
+        print(f"  ✓ Model saved to {model_output_path}")
         
         return True
         

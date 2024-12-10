@@ -1,7 +1,7 @@
 import pandas as pd
 from sqlalchemy import create_engine
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import accuracy_score, classification_report
 import joblib  
 
@@ -12,8 +12,6 @@ def load_cleaned_data(database_path):
     return driver_aggregates
 
 def prepare_data(driver_aggregates):
-
-    from sklearn.preprocessing import StandardScaler
     
     numeric_columns = driver_aggregates.select_dtypes(include=['float64', 'int64']).columns
     driver_aggregates[numeric_columns] = driver_aggregates[numeric_columns].fillna(0)
@@ -40,8 +38,6 @@ def prepare_data(driver_aggregates):
     return X_train, X_test, y_train, y_test, scaler 
 
 def train_model(X_train, y_train):
-
-    from sklearn.ensemble import RandomForestClassifier
     
     model = RandomForestClassifier(
         n_estimators=200,
@@ -85,6 +81,8 @@ if __name__ == "__main__":
     
     print("Loading cleaned data...")
     driver_aggregates = load_cleaned_data(database_path)
+    
+    print("Preparing data for training...")
     X_train, X_test, y_train, y_test, scaler = prepare_data(driver_aggregates)
     
     print("Training model...")
@@ -93,5 +91,9 @@ if __name__ == "__main__":
     print("Evaluating model...")
     evaluate_model(model, X_test, y_test)
     
+    print("Saving model and scaler...")
     save_model(model, scaler, model_output_path)
+
+    scaler_path = model_output_path.replace('.pkl', '_scaler.pkl')
+    joblib.dump(scaler, scaler_path)
     
