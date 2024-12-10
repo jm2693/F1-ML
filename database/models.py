@@ -48,20 +48,6 @@ class ConstructorStanding(Base):
     points = Column(Float)
     wins = Column(Integer)
     position = Column(Integer)
-
-class Weather(Base):
-    __tablename__ = 'weather'
-    
-    id = Column(Integer, primary_key=True)
-    season = Column(Integer)
-    round = Column(Integer)
-    circuit_id = Column(String)
-    weather_description = Column(String)
-    weather_warm = Column(Boolean)
-    weather_cold = Column(Boolean)
-    weather_dry = Column(Boolean)
-    weather_wet = Column(Boolean)
-    weather_cloudy = Column(Boolean)
     
 class Qualifying(Base):
     __tablename__ = 'qualifying'

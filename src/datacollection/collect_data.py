@@ -2,9 +2,9 @@ import requests
 import pandas as pd
 from typing import List
 from datetime import datetime
-# from selenium import webdriver
+from bs4 import BeautifulSoup
 from database.database import Database
-from database.models import Qualifying, Race, Result, DriverStanding, ConstructorStanding, Weather
+from database.models import Qualifying, Race, Result, DriverStanding, ConstructorStanding
 
 def collect_race_data(start_year: int = 1950, end_year: int = 2020):
 
@@ -20,7 +20,6 @@ def collect_race_data(start_year: int = 1950, end_year: int = 2020):
             json = r.json()
 
             for item in json['MRData']['RaceTable']['Races']:
-                # Create race entry
                 race = Race(
                     season=int(item['season']),
                     round=int(item['round']),
@@ -31,7 +30,6 @@ def collect_race_data(start_year: int = 1950, end_year: int = 2020):
                 session.add(race)
                 session.flush()
 
-                # Get results for this race
                 results_url = f'http://ergast.com/api/f1/{year}/{item["round"]}/results.json'
                 results_r = requests.get(results_url)
                 results_json = results_r.json()
@@ -140,13 +138,7 @@ def collect_constructor_standings(rounds: List[List]):
         session.close()
 
 def get_rounds(races_data):
-    """
-    Args:
-        races_data: The races table from our database
-        
-    Returns:
-        List of [year, [round_numbers]] pairs
-    """
+
     rounds = []
     for year in races_data.season.unique():
         rounds.append([year, list(races_data[races_data.season == year]['round'])])
@@ -186,84 +178,6 @@ def collect_qualifying_data(start_year: int = 1983, end_year: int = 2020):
         raise
     finally:
         session.close()
-
-def collect_weather_data(races_data):
-
-    db = Database()
-    session = db.get_session()
-
-    weather_dict = {
-        'weather_warm': ['soleggiato', 'clear', 'warm', 'hot', 'sunny', 'fine', 'mild', 'sereno'],
-        'weather_cold': ['cold', 'fresh', 'chilly', 'cool'],
-        'weather_dry': ['dry', 'asciutto'],
-        'weather_wet': ['showers', 'wet', 'rain', 'pioggia', 'damp', 'thunderstorms', 'rainy'],
-        'weather_cloudy': ['overcast', 'nuvoloso', 'clouds', 'cloudy', 'grey', 'coperto']
-    }
-
-    try:
-        for _, race in races_data.iterrows():
-            print(f"Collecting weather data for {race['season']} Round {race['round']}...")
-            
-            try:
-                weather_text = scrape_weather_from_wiki(race['url'])
-            except:
-                weather_text = 'not found'
-
-            weather_conditions = {
-                category: 1 if any(word in weather_text.lower() for word in terms) else 0
-                for category, terms in weather_dict.items()
-            }
-
-            weather_entry = Weather(
-                season=race['season'],
-                round=race['round'],
-                circuit_id=race['circuit_id'],
-                weather_description=weather_text,
-                **weather_conditions
-            )
-            session.add(weather_entry)
-            
-            if _ % 50 == 0: 
-                session.commit()
-
-        session.commit()
-
-    except Exception as e:
-        print(f"Error collecting weather data: {str(e)}")
-        session.rollback()
-        raise
-    finally:
-        session.close()
-        
-def scrape_weather_from_wiki(url):
-
-    try:
-        df = pd.read_html(url)[0]
-        if 'Weather' in list(df.iloc[:,0]):
-            n = list(df.iloc[:,0]).index('Weather')
-            return df.iloc[n,1]
-        else:
-            for i in range(1, 4):
-                try:
-                    df = pd.read_html(url)[i]
-                    if 'Weather' in list(df.iloc[:,0]):
-                        n = list(df.iloc[:,0]).index('Weather')
-                        return df.iloc[n,1]
-                except:
-                    continue
-                    
-            driver = webdriver.Chrome()
-            driver.get(url)
-            
-            button = driver.find_element_by_link_text('Italiano')
-            button.click()
-            
-            clima = driver.find_element_by_xpath('//*[@id="mw-content-text"]/div/table[1]/tbody/tr[9]/td').text
-            return clima
-    except:
-        return 'not found'
-    
-    
     
 def collect_qualifying_data(start_year: int = 1983, end_year: int = 2020):
     """
@@ -348,4 +262,3 @@ if __name__ == "__main__":
     
     collect_driver_standings(rounds)
     collect_constructor_standings(rounds)
-    collect_weather_data(races_df)

@@ -8,7 +8,6 @@ def load_data(engine):
         races = pd.read_sql("SELECT * FROM races", engine)
         results = pd.read_sql("SELECT * FROM results", engine)
         driver_standings = pd.read_sql("SELECT * FROM driver_standings", engine)
-        weather = pd.read_sql("SELECT * FROM weather", engine)
         
         try:
             qualifying = pd.read_sql("SELECT * FROM qualifying", engine)
@@ -18,7 +17,7 @@ def load_data(engine):
         if races.empty or results.empty:
             raise ValueError("Required race or results data is missing")
         
-        return races, results, driver_standings, weather, qualifying
+        return races, results, driver_standings, qualifying
     except Exception as e:
         print(f"Error loading data: {str(e)}")
         raise
@@ -71,15 +70,6 @@ def clean_qualifying(qualifying_df):
     qualifying_df['qualifying_time'] = qualifying_df['qualifying_time'].apply(convert_time_to_seconds)
     return qualifying_df
 
-def clean_weather(weather_df):
-
-    bool_columns = ['weather_warm', 'weather_cold', 'weather_dry', 
-                   'weather_wet', 'weather_cloudy']
-    for col in bool_columns:
-        weather_df[col] = weather_df[col].astype(bool)
-    
-    return weather_df
-
 def aggregate_driver_data(results_df, races_df):
     
     merged_df = results_df.merge(races_df[['id', 'date', 'season']], 
@@ -95,8 +85,8 @@ def aggregate_driver_data(results_df, races_df):
         total_races=('race_id', 'count'),
         dnf_races=('status', lambda x: (x == 'DNF').sum()),
         mechanical_failures=('status', lambda x: (x == 'DNF-Mechanical').sum()),
-        consistency_score=('points', lambda x: x.std()),  # Lower std = more consistent
-        qualifying_performance=('grid', lambda x: (x <= 3).sum()),  # Front row starts
+        consistency_score=('points', lambda x: x.std()),  
+        qualifying_performance=('grid', lambda x: (x <= 3).sum()),  
         comeback_drives=('points', lambda x: ((x > 0) & (merged_df.loc[x.index, 'grid'] > 10)).sum()),
         points_per_race=('points', 'mean'),
         finish_rate=('status', lambda x: (x == 'Finished').mean())
@@ -146,11 +136,10 @@ def add_target_variable(driver_aggregates, driver_standings_df):
     
     return driver_aggregates
 
-def save_cleaned_data(driver_data, constructor_data, weather_data, qualifying_data, engine):
+def save_cleaned_data(driver_data, constructor_data, qualifying_data, engine):
 
     driver_data.to_sql("driver_aggregates", engine, if_exists="replace", index=False)
     constructor_data.to_sql("constructor_aggregates", engine, if_exists="replace", index=False)
-    weather_data.to_sql("cleaned_weather", engine, if_exists="replace", index=False)
     qualifying_data.to_sql("cleaned_qualifying", engine, if_exists="replace", index=False)
 
 def clean_and_aggregate_data(database_path):
@@ -160,19 +149,16 @@ def clean_and_aggregate_data(database_path):
 
     try:
         print("Loading raw data...")
-        races, results, driver_standings, weather, qualifying = load_data(engine)
+        races, results, driver_standings, qualifying = load_data(engine)
         
         print("Cleaning individual datasets...")
         try:
             races = clean_races(races)
             results = clean_results(results)
-            weather = clean_weather(weather)
             
             if qualifying is not None and not qualifying.empty:
                 qualifying = clean_qualifying(qualifying)
-                print("Qualifying cleaned")
             else:
-                print("No qualifying data to clean")
                 qualifying = pd.DataFrame()  # Create empty DataFrame
         
         except Exception as e:
@@ -192,7 +178,7 @@ def clean_and_aggregate_data(database_path):
         print("Saving cleaned data...")
         try:
             save_cleaned_data(driver_aggregates, constructor_aggregates, 
-                            weather, qualifying, engine)
+                            qualifying, engine)
             print("All cleaned data saved")
             
         except Exception as e:
