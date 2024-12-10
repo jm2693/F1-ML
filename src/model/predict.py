@@ -12,9 +12,19 @@ class F1Predictor:
         self.engine = create_engine(f'sqlite:///{database_path}')
 
     def get_latest_driver_data(self):
-
+        """
+        Retrieves the most recent driver statistics from our database,
+        ensuring one row per driver for the latest season.
+        """
         query = """
-        SELECT * FROM driver_aggregates 
+        SELECT DISTINCT driver, season, 
+            total_points, total_wins, podiums, 
+            avg_grid_position, avg_final_position, 
+            total_races, dnf_races, mechanical_failures,
+            finish_rate, consistency_score, 
+            qualifying_performance, comeback_drives, 
+            points_per_race
+        FROM driver_aggregates 
         WHERE season = (SELECT MAX(season) FROM driver_aggregates)
         """
         return pd.read_sql(query, self.engine)
